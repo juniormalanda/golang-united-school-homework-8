@@ -2,15 +2,13 @@ package file
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
+	"io/ioutil"
 	"os"
 )
 
-const (
-	rootDir = "data/"
-)
-
-type NotFoundError error
+var NotFoundError = errors.New("Not found")
+var ItemExistsError = errors.New("Item already exists")
 
 type File struct {
 	name string
@@ -18,19 +16,16 @@ type File struct {
 }
 
 func NewFile(fileName string) *File {
-	file := &File{name: fileName}
-	file.open()
-
-	return file
+	return &File{name: fileName}
 }
 
-func (f *File) Close() {
+func (f *File) close() {
 	f.file.Close()
 }
 
 func (f *File) open() error {
 	if f.file == nil {
-		file, err := os.OpenFile(rootDir+f.name, os.O_RDWR|os.O_CREATE, 0755)
+		file, err := os.OpenFile(f.name, os.O_RDWR|os.O_CREATE, 0755)
 
 		if err != nil {
 			return nil
@@ -42,10 +37,8 @@ func (f *File) open() error {
 	return nil
 }
 
-func (f *File) AddUser(item string) (err error) {
-	var user User
-
-	err = json.Unmarshal([]byte(item), user)
+func (f *File) AddUser(item string) (user User, err error) {
+	err = json.Unmarshal([]byte(item), &user)
 
 	if err != nil {
 		return
@@ -57,9 +50,15 @@ func (f *File) AddUser(item string) (err error) {
 		return
 	}
 
+	for _, u := range users {
+		if u.Id == user.Id {
+			return user, ItemExistsError
+		}
+	}
+
 	users = append(users, user)
 
-	err = f.putUsers(users)
+	err = f.put(users)
 
 	return
 }
@@ -71,32 +70,32 @@ func (f *File) Users() (users []User, err error) {
 		return
 	}
 
-	err = json.Unmarshal(data, users)
+	err = json.Unmarshal(data, &users)
 
 	return
 }
 
-func (f *File) putUsers(users []User) (err error) {
+func (f *File) put(users []User) (err error) {
 	data, err := json.Marshal(users)
 
 	if err != nil {
 		return
 	}
 
+	f.open()
+	defer f.close()
 	_, err = f.file.Write(data)
 
 	return
 }
 
 func (f *File) List() ([]byte, error) {
-	var data []byte
-
-	f.file.Read(data)
-
-	return data, nil
+	f.open()
+	defer f.close()
+	return ioutil.ReadAll(f.file)
 }
 
-func (f *File) Remove(id string) (succeed bool, err error) {
+func (f *File) Remove(id string) (err error) {
 	users, err := f.Users()
 
 	if err != nil {
@@ -106,15 +105,12 @@ func (f *File) Remove(id string) (succeed bool, err error) {
 	for i, user := range users {
 		if user.Id == id {
 			users = append(users[:i], users[i+1:]...)
-			f.putUsers(users)
-			succeed = true
+			f.put(users)
 			return
 		}
 	}
 
-	err = fmt.Errorf("Item with id %s not found", id)
-
-	return
+	return NotFoundError
 }
 
 func (f *File) FindById(id string) (data []byte, err error) {

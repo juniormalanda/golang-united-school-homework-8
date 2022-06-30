@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -53,9 +54,7 @@ func Perform(args Arguments, writer io.Writer) error {
 		return fmt.Errorf("-fileName flag has to be specified")
 	}
 
-	file := file.NewFile(fileName)
-
-	defer file.Close()
+	f := file.NewFile(fileName)
 
 	operation, ok := args["operation"]
 
@@ -70,14 +69,21 @@ func Perform(args Arguments, writer io.Writer) error {
 			return fmt.Errorf("-item flag has to be specified")
 		}
 
-		err := file.AddUser(item)
+		user, err := f.AddUser(item)
+
+		if errors.Is(err, file.ItemExistsError) {
+			writer.Write([]byte(fmt.Sprintf("Item with id %s already exists", user.Id)))
+
+			return nil
+		}
+
 		if err != nil {
 			return err
 		}
 
 		writer.Write([]byte("Item successfully added"))
 	case "list":
-		data, err := file.List()
+		data, err := f.List()
 		if err != nil {
 			return err
 		}
@@ -88,7 +94,7 @@ func Perform(args Arguments, writer io.Writer) error {
 			return fmt.Errorf("-id flag has to be specified")
 		}
 
-		data, err := file.FindById(id)
+		data, err := f.FindById(id)
 
 		if err != nil {
 			return err
@@ -101,10 +107,12 @@ func Perform(args Arguments, writer io.Writer) error {
 			return fmt.Errorf("-id flag has to be specified")
 		}
 
-		succeed, err := file.Remove(id)
+		err := f.Remove(id)
 
-		if !succeed {
-			writer.Write([]byte(err.Error()))
+		if errors.Is(err, file.NotFoundError) {
+			writer.Write([]byte(fmt.Sprintf("Item with id %s not found", id)))
+
+			return nil
 		}
 
 		if err != nil {
