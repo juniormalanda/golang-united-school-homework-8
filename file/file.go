@@ -12,29 +12,10 @@ var ItemExistsError = errors.New("Item already exists")
 
 type File struct {
 	name string
-	file *os.File
 }
 
 func NewFile(fileName string) *File {
 	return &File{name: fileName}
-}
-
-func (f *File) close() {
-	f.file.Close()
-}
-
-func (f *File) open() error {
-	if f.file == nil {
-		file, err := os.OpenFile(f.name, os.O_RDWR|os.O_CREATE, 0755)
-
-		if err != nil {
-			return nil
-		}
-
-		f.file = file
-	}
-
-	return nil
 }
 
 func (f *File) AddUser(item string) (user User, err error) {
@@ -82,17 +63,27 @@ func (f *File) put(users []User) (err error) {
 		return
 	}
 
-	f.open()
-	defer f.close()
-	_, err = f.file.Write(data)
+	file, err := os.OpenFile(f.name, os.O_APPEND|os.O_CREATE|os.O_TRUNC, 0755)
+
+	if err != nil {
+		return nil
+	}
+
+	defer file.Close()
+	_, err = file.Write(data)
 
 	return
 }
 
 func (f *File) List() ([]byte, error) {
-	f.open()
-	defer f.close()
-	return ioutil.ReadAll(f.file)
+	file, err := os.OpenFile(f.name, os.O_RDONLY|os.O_CREATE, 0755)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+	return ioutil.ReadAll(file)
 }
 
 func (f *File) Remove(id string) (err error) {
