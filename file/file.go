@@ -51,6 +51,10 @@ func (f *File) Users() (users []User, err error) {
 		return
 	}
 
+	if len(data) == 0 {
+		return
+	}
+
 	err = json.Unmarshal(data, &users)
 
 	return
