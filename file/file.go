@@ -67,7 +67,7 @@ func (f *File) put(users []User) (err error) {
 		return
 	}
 
-	file, err := os.OpenFile(f.name, os.O_APPEND|os.O_CREATE|os.O_TRUNC, 0755)
+	file, err := os.OpenFile(f.name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 
 	if err != nil {
 		return nil
@@ -80,7 +80,7 @@ func (f *File) put(users []User) (err error) {
 }
 
 func (f *File) List() ([]byte, error) {
-	file, err := os.OpenFile(f.name, os.O_RDONLY|os.O_CREATE, 0755)
+	file, err := os.OpenFile(f.name, os.O_RDWR|os.O_CREATE, 0755)
 
 	if err != nil {
 		return nil, err
